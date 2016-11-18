@@ -14,8 +14,8 @@ df = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/brea
 
 X, y = df.iloc[:, 2:31], df.iloc[:, 1]  #DataFrame con los valores calculados para cada muestra y Series lasificacion correspondiente de cada fila en X
 
-#y.replace('M', -1, inplace=True)
-#y.replace('B', 1, inplace=True)
+y.replace('M', -1, inplace=True)
+y.replace('B', 1, inplace=True)
 
 
 linear_svc = SVC(kernel='linear')     #Kernel lineal
