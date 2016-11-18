@@ -28,7 +28,7 @@ kernels = [linear_svc, poly_svc, rbf_svc, sig_svc]
 X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.5, random_state=0)         #len(X_train) = 284, len(y_train) = 284
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=0)    #len(X_test) = 143, len(y_test) = 143, len(X_val) = 142, len(y_val) = 142
 
-
+'''
 def plot_confusion_matrix(confmat):
     fig, ax = plt.subplots(figsize=(2.5, 2.5))
     ax.matshow(confmat, cmap=plt.cm.Blues,  alpha=0.3)
@@ -61,9 +61,10 @@ def test(preds, y_test):
 
 for k in kernels:
     train_and_evaluate(k, X_train, X_val, X_test, y_train, y_test, y_val)
-
+'''
 
 # -------------------------------------------------------------------------------------------------
 
 lr = LogisticRegression(C=1000.0, random_state=0)
-lr.fit(X_train, y_train)
+
+print('Logistic Regression score: %f'% lr.fit(X_train, y_train).score(X_val, y_val))
