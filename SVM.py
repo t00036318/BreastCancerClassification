@@ -6,26 +6,28 @@ from sklearn import metrics
 from sklearn.svm import SVC
 from sklearn.cross_validation import train_test_split, cross_val_score, KFold
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
+from sklearn.neural_network import MLPClassifier
 
-df = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/wdbc.data', header=None)   #Dataframe: conjunto de datos
+df = pd.read_csv('wdbc.data.txt', header=None)   #Dataframe: conjunto de datos
 
-X, y = df.iloc[:, 2:31], df.iloc[:, 1]                  #DataFrame con los valores calculados para cada muestra y Series correspondiente de cada fila en X
+X, y = df.iloc[:, 2:31], df.iloc[:, 1]           #DataFrame con los valores calculados para cada muestra y Series correspondiente de cada fila en X
 
 y.replace('M', -1, inplace=True)
 y.replace('B', 1, inplace=True)
 
-linear_svc = SVC(kernel='linear')                           #Kernel lineal
-poly_svc = SVC(kernel='poly', gamma=0.2, degree=2)          #Kernel polinomial
-rbf_svc = SVC(kernel='rbf', gamma=0.0001, C=7.0)            #Kernel gaussiano
-sig_svc = SVC(kernel='sigmoid', gamma=0.0000001, C=10.0)     #Kernel sigmoide
-kernels = [linear_svc, poly_svc, rbf_svc, sig_svc]
-
 X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.5, random_state=0)         #len(X_train) = 284, len(y_train) = 284
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=0)    #len(X_test) = 143, len(y_test) = 143, len(X_val) = 142, len(y_val) = 142
 
-'''
-def plot_confusion_matrix(confmat):                            #Función que grafica la matriz de confusión
+#SUPPORT VECTOR MACHINE
+
+linear_svc = SVC(kernel='linear')                           #Kernel lineal
+poly_svc = SVC(kernel='poly', gamma=0.2, degree=2)          #Kernel polinomial
+rbf_svc = SVC(kernel='rbf', gamma=0.0001, C=7.0)            #Kernel gaussiano
+sig_svc = SVC(kernel='sigmoid', gamma=0.0000001, C=10.0)    #Kernel sigmoide
+kernels = [linear_svc, poly_svc, rbf_svc, sig_svc]
+
+
+def plot_confusion_matrix(confmat):                         #Funcion que grafica la matriz de confusion
     fig, ax = plt.subplots(figsize=(2.5, 2.5))
     ax.matshow(confmat, cmap=plt.cm.Blues,  alpha=0.3)
     for i in range(confmat.shape[0]):
@@ -37,21 +39,21 @@ def plot_confusion_matrix(confmat):                            #Función que gra
     plt.show()
 
 
-def train(estimator, x_train, y_train):                         #Función que entrena el modelo
+def train(estimator, x_train, y_train):                     #Funcion que entrena el modelo
     estimator.fit(x_train, y_train)
 
 
-#train(rbf_svc, X_train, y_train)
-#pred = rbf_svc.predict(X_train)
-#print(metrics.classification_report(y_train, pred))
+def kFold(estimator, x_val, y_val):
+    f = 5
+    cv = KFold(len(y_val), f, shuffle=True, random_state=0)
+    scores = cross_val_score(estimator, x_val, y_val, cv=cv)
+    return scores
 
 
-def validate(x_val, y_val):                                  #Función de validación
+def validate_svm(x_val, y_val, x_train, y_train, x_test, y_test):                                  #Funcion de validacion
     mayor, nombre, best_K = 0, "", 0
     for k in kernels:
-        f = 5
-        cv = KFold(len(y_val), f, shuffle=True, random_state=0)
-        scores = cross_val_score(k, x_val, y_val, cv=cv)
+        scores = kFold(k, x_val, y_val)                      #Validacion KFold
 
         if k == linear_svc:
             K = "Lineal"
@@ -69,25 +71,26 @@ def validate(x_val, y_val):                                  #Función de valida
             nombre = K
             best_K = k
 
-        print("Coeficiente de determinación promedio del kernel", K,"=", prom)    #Coeficiente: calidad del modelo para replicar los resultados
+        print("Coeficiente de determinacion promedio del kernel", K,"=", prom)    #Coeficiente: calidad del modelo para replicar los resultados
 
     print("Mejor kernel:", nombre)
-    test(best_K, X_train, y_train, X_test, y_test)
+    test(best_K, x_train, y_train, x_test, y_test)
 
 
-def test(best_K, x_train, y_train, x_test, y_test):
-    train(best_K, x_train, y_train)
-    preds = best_K.predict(x_test)
-    print_results(x_test, y_test, preds)
-'''
-def print_results(x_test, y_test, preds):
-    print("Reporte de Clasificación:")
+def test(best_clf, x_train, y_train, x_test, y_test):
+    train(best_clf, x_train, y_train)
+    preds = best_clf.predict(x_test)
+    print_results(best_clf, x_test, y_test, preds)
+
+
+def print_results(estimator, x_test, y_test, preds):
+    print("Reporte de Clasificacion:")
     print(metrics.classification_report(y_test, preds))
-    print("Matriz de Confusión:")
+    print("Matriz de Confusion:")
     M = metrics.confusion_matrix(y_test, preds)
     print(M)
-    #plot_confusion_matrix(M)
-    scores = cross_val_score(best_K, x_test, y_test, cv=5)
+    plot_confusion_matrix(M)
+    scores = cross_val_score(estimator, x_test, y_test, cv=5)
     print("Exactitud: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
     #plot_decision_regions(X_train_plot, y_train, classifier=best_K)
@@ -96,74 +99,67 @@ def print_results(x_test, y_test, preds):
     #plt.legend(loc='upper left')
     #plt.show()
 
-#validate(X_val, y_val)
+validate_svm(X_val, y_val, X_train, y_train, X_test, y_test)
+
+print("-------------------------------------------------------------------------------------------------")
+#LOGISTIC REGRESSION
+
+
+def validate_lr(x_val, y_val, x_train, y_train, x_test, y_test):
+    mayor, c, p = 0, 0, ""
+    for C in enumerate((100, 1, 0.01)):
+        clf_l1 = LogisticRegression(C=C, penalty='l1', tol=0.01)       #Valores mAs pequenios de c incrementan la regularizacion
+        clf_l2 = LogisticRegression(C=C, penalty='l2', tol=0.01)
+        train(clf_l1, x_train, y_train)
+        train(clf_l2, x_train, y_train)
+        score_lr1 = clf_l1.score(x_val, y_val)
+        score_lr2 = clf_l2.score(x_val, y_val)
+
+        if score_lr1 > mayor:
+            mayor = score_lr1
+            c = C
+            p = 'l1'
+        if score_lr2 > mayor:
+            mayor = score_lr2
+            c = C
+            p = 'l2'
+
+    best_lr = LogisticRegression(C=c, penalty=p, tol=0.01)
+    test(best_lr, x_train, y_train, x_test, y_test)
+
+validate_lr(X_val, y_val, X_train, y_train, X_test, y_test)
 
 print("-------------------------------------------------------------------------------------------------")
 
-
-#C = [1, 10, 100, 1000]                         #Valores más pequeños de c incrementan la regularización
-
-lr = LogisticRegression(C=10)
-lr.fit(X_train, y_train)
-print('Exactitud:', lr.score(X_val, y_val))
-
-f = 5
-cv = KFold(len(y_val), f, shuffle=True, random_state=0)
-scores = cross_val_score(lr, X_val, y_val, cv=cv)
-print("Coeficiente de determinación promedio", scores.mean())
+#MULTILAYER PERCEPTRON
 
 
-def test(x_train, y_train, x_test, y_test):
-    lr = LogisticRegression(C=1, random_state=0)
-    lr.fit(x_train, y_train)
-    preds = lr.predict(x_test)
+def validate_mlp(x_train, y_train, x_test, y_test, x_val, y_val):
+    solver = ['lbfgs', 'sgd']
+    a = ['tanh', 'logistic', 'relu']
+    hl = [(250, 5), (200, 2), (150, 2), (100, 4)]
+    mayor = 0
+    for s in solver:
+        for act in a:
+            for h in hl:
+                clf = MLPClassifier(solver=s, alpha=1e-5, hidden_layer_sizes=h, activation=act, random_state=1)
+                scores_mlp = kFold(clf, x_val, y_val)
 
-    print_results(x_test, y_test, preds)
+                prom = scores_mlp.mean()
 
+                if prom > mayor:
+                    mayor = prom
+                    S = s
+                    A = act
+                    HL = h
 
-test(X_train, y_train, X_test, y_test)
+            print("Mejores parametros: \n Solver =", S, "\n Activation = ", A, "\n Hidden Layer Sizes = ", HL)
+            clf = MLPClassifier(solver=S, alpha=1e-5, hidden_layer_sizes=HL, activation=A, random_state=1)
+            test(clf, x_train, y_train, x_test, y_test)
 
-
-
-
-
-
-
-
-
-'''
-def validate_lr(x_train, y_train, x_val, y_val):
-    mayor, z, prom = 0, 0, 0
-    for c in C:
-        lr = LogisticRegression(C=c, random_state=0)
-        f = 5
-        cv = KFold(len(y_val), f, shuffle=True, random_state=0)
-        scores = cross_val_score(lr, x_val, y_val, cv=cv)
-        prom = scores.mean()
-
-        if prom > mayor:
-            mayor = prom
-            z = c
-
-        print("Coeficiente de determinación promedio ", prom)
-
-    test(z, x_train, y_train, X_test, y_test)
+validate_mlp(X_train, y_train, X_test, y_test, X_val, y_val)
 
 
-def test(best_c, x_train, y_train, x_test, y_test):
-    print(best_c)
-    lr = LogisticRegression(C=10, random_state=0)
-    lr.fit(x_train, y_train)
-    preds = lr.predict(x_test)
 
-    print("Reporte de Clasificación:")
-    print(metrics.classification_report(y_test, preds))
-    print("Matriz de Confusión:")
-    M = metrics.confusion_matrix(y_test, preds)
-    print(M)
-    #plot_confusion_matrix(M)
-    scores = cross_val_score(lr, x_test, y_test, cv=5)
-    print("Exactitud: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2))
 
-validate_lr(X_train, y_train, X_val, y_val)
-'''
+
