@@ -12,8 +12,8 @@ df = pd.read_csv('wdbc.data.txt', header=None)   #Dataframe: conjunto de datos
 
 X, y = df.iloc[:, 2:31], df.iloc[:, 1]           #DataFrame con los valores calculados para cada muestra y Series correspondiente de cada fila en X
 
-y.replace('M', 1, inplace=True)
-y.replace('B', 0, inplace=True)
+y.replace('M', 1, inplace=True)                  #Clase positiva (Sí tiene cáncer)
+y.replace('B', 0, inplace=True)                  #Clase negativa (No tiene cáncer)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.5, random_state=0)         #len(X_train) = 284, len(y_train) = 284
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=0)    #len(X_test) = 143, len(y_test) = 143, len(X_val) = 142, len(y_val) = 142
@@ -38,7 +38,6 @@ linear_svc = SVC(kernel='linear')                           #Kernel lineal
 poly_svc = SVC(kernel='poly', gamma=0.2, degree=2)          #Kernel polinomial
 rbf_svc = SVC(kernel='rbf', gamma=0.0001, C=7.0)            #Kernel gaussiano
 sig_svc = SVC(kernel='sigmoid', gamma=0.0000001, C=10.0)    #Kernel sigmoide
-kernels = [linear_svc, poly_svc, rbf_svc, sig_svc]
 
 
 def train(estimator, x_train, y_train):                     #Función que entrena el modelo
@@ -53,8 +52,10 @@ def kFold(estimator, x_val, y_val):                         #Validación KFold
 
 
 def validate_svm(x_val, y_val, x_train, y_train, x_test, y_test):    #Función de validación de SVM
+    kernels = [linear_svc, poly_svc, rbf_svc, sig_svc]
     mayor, nombre, best_K = 0, "", 0
     for k in kernels:
+        train(k, x_train, y_train)
         scores = kFold(k, x_val, y_val)
 
         if k == linear_svc:
