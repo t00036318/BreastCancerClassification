@@ -4,7 +4,7 @@ from matplotlib.colors import ListedColormap
 import numpy as np
 from sklearn import metrics
 from sklearn.svm import SVC
-from sklearn.cross_validation import train_test_split, cross_val_score, KFold
+from sklearn.model_selection import cross_val_score, train_test_split, KFold
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 
@@ -12,13 +12,13 @@ df = pd.read_csv('wdbc.data.txt', header=None)   #Dataframe: conjunto de datos
 
 X, y = df.iloc[:, 2:31], df.iloc[:, 1]           #DataFrame con los valores calculados para cada muestra y Series correspondiente de cada fila en X
 
-y.replace('M', -1, inplace=True)
-y.replace('B', 1, inplace=True)
+y.replace('M', 1, inplace=True)
+y.replace('B', 0, inplace=True)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.5, random_state=0)         #len(X_train) = 284, len(y_train) = 284
 X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=0)    #len(X_test) = 143, len(y_test) = 143, len(X_val) = 142, len(y_val) = 142
 
-
+best_results = []
 
 def plot_confusion_matrix(confmat):                         #Función que grafica la matriz de confusión
     fig, ax = plt.subplots(figsize=(2.5, 2.5))
@@ -32,6 +32,7 @@ def plot_confusion_matrix(confmat):                         #Función que grafic
     plt.show()
 
 #SUPPORT VECTOR MACHINE
+print("MÁQUINA DE VECTORES DE SOPORTE")
 
 linear_svc = SVC(kernel='linear')                           #Kernel lineal
 poly_svc = SVC(kernel='poly', gamma=0.2, degree=2)          #Kernel polinomial
@@ -46,7 +47,7 @@ def train(estimator, x_train, y_train):                     #Función que entren
 
 def kFold(estimator, x_val, y_val):                         #Validación KFold
     f = 5
-    cv = KFold(len(y_val), f, shuffle=True, random_state=0)
+    cv = KFold(shuffle=True, n_splits=f, random_state=0)
     scores = cross_val_score(estimator, x_val, y_val, cv=cv)
     return scores
 
@@ -85,9 +86,7 @@ def test(best_clf, x_train, y_train, x_test, y_test):
 
 
 def print_results(y_test, preds):
-    print("Matriz de Confusión:")
     M = metrics.confusion_matrix(y_test, preds)
-    print(M)
     plot_confusion_matrix(M)
     TP, FN, FP, TN = M[0][0], M[0][1], M[1][0], M[1][1]
     accuracy = (TP + TN) / (TP + FN + FP + TN)
@@ -98,6 +97,7 @@ def print_results(y_test, preds):
     print("Sensibilidad =", sensitivity)
     print("Especificidad =", specificity)
     print("Valor-F =", f1)
+    best_results.append(accuracy)
 
 
     #plot_decision_regions(X_train_plot, y_train, classifier=best_K)
@@ -109,18 +109,21 @@ def print_results(y_test, preds):
 validate_svm(X_val, y_val, X_train, y_train, X_test, y_test)
 
 print("-------------------------------------------------------------------------------------------------")
+print("REGRESIÓN LOGÍSTICA REGULARIZADA")
 #LOGISTIC REGRESSION
 
 
 def validate_lr(x_val, y_val, x_train, y_train, x_test, y_test):
-    mayor, c, p = 0, 0, ""
-    for C in enumerate((100, 1, 0.01)):
+    mayor, vc, p, c = 0, [100, 1, 0.01], "", 0
+    for C in vc:
         clf_l1 = LogisticRegression(C=C, penalty='l1', tol=0.01)       #Valores más pequeños de c incrementan la regularización
         clf_l2 = LogisticRegression(C=C, penalty='l2', tol=0.01)
         train(clf_l1, x_train, y_train)
         train(clf_l2, x_train, y_train)
-        score_lr1 = clf_l1.score(x_val, y_val)
-        score_lr2 = clf_l2.score(x_val, y_val)
+        score_lr1 = kFold(clf_l1, x_val, y_val)
+        score_lr2 = kFold(clf_l2, x_val, y_val)
+        score_lr1 = score_lr1.mean()
+        score_lr2 = score_lr2.mean()
 
         if score_lr1 > mayor:
             mayor = score_lr1
@@ -132,24 +135,26 @@ def validate_lr(x_val, y_val, x_train, y_train, x_test, y_test):
             p = 'l2'
 
     best_lr = LogisticRegression(C=c, penalty=p, tol=0.01)
+    print("Mejores parámetros: \nRegularización =", p, "\nC =", c)
     test(best_lr, x_train, y_train, x_test, y_test)
 
 validate_lr(X_val, y_val, X_train, y_train, X_test, y_test)
 
 print("-------------------------------------------------------------------------------------------------")
-
+print("PERCEPTRON MULTICAPA")
 #MULTILAYER PERCEPTRON
 
 
 def validate_mlp(x_train, y_train, x_test, y_test, x_val, y_val):
-    solver = ['lbfgs', 'sgd']
+    solver = ['lbfgs', 'sgd', 'adam']
     a = ['tanh', 'logistic', 'relu']
-    hl = [(250, 5), (200, 2), (150, 2), (100, 4)]
-    mayor = 0
+    hl = [(250, 5), (200, 2), (150, 2), (100, 2)]
+    mayor, S, A, HL = 0, 0, 0, 0
     for s in solver:
         for act in a:
             for h in hl:
-                clf = MLPClassifier(solver=s, alpha=1e-5, hidden_layer_sizes=h, activation=act, random_state=1)
+                clf = MLPClassifier(solver=s, alpha=1e-5, hidden_layer_sizes=h, activation=act, random_state=1,
+                                    max_iter=2200)
                 scores_mlp = kFold(clf, x_val, y_val)
 
                 prom = scores_mlp.mean()
@@ -160,8 +165,18 @@ def validate_mlp(x_train, y_train, x_test, y_test, x_val, y_val):
                     A = act
                     HL = h
 
-            print("Mejores parámetros: \n Optimizador=", S, "\n Función de Activación = ", A, "\n Tamaño de la capa oculta = ", HL)
-            clf = MLPClassifier(solver=S, alpha=1e-5, hidden_layer_sizes=HL, activation=A, random_state=1)
-            test(clf, x_train, y_train, x_test, y_test)
+    print("Mejores parámetros: \nOptimizador =", S, "\nFunción de Activación = ", A, "\nTamaño de la capa oculta = ",
+          HL)
+    clf = MLPClassifier(solver=S, alpha=1e-5, hidden_layer_sizes=HL, activation=A, random_state=1)
+    test(clf, x_train, y_train, x_test, y_test)
 
 validate_mlp(X_train, y_train, X_test, y_test, X_val, y_val)
+
+print("-------------------------------------------------------------------------------------------------")
+maxACC = np.argmax(best_results)
+if maxACC == 0:
+    print("El algoritmo con mayor exactitud es MÁQUINA DE VECTORES DE SOPORTE")
+elif maxACC == 1:
+    print("El algoritmo con mayor exactitud es REGRESIÓN LOGÍSTICA REGULARIZADA")
+else:
+    print("El algoritmo con mayor exactitud es PERCEPTRON MULTICAPA")
